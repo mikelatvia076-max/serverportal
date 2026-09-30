@@ -1,6 +1,6 @@
 // =====================================
 // AGNES MEMORIAL MEDICAL HOSPITAL
-// BACKEND SERVER (CLEANED & FIXED)
+// BACKEND SERVER (API only - the websites are in their own repos)
 // =====================================
 
 require("dotenv").config();
@@ -9,8 +9,6 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("./database");
-const path = require("path");
-const fs = require("fs");
 
 const app = express();
 // A known default secret would let anyone forge staff tokens, so if JWT_SECRET
@@ -23,72 +21,15 @@ if (!process.env.JWT_SECRET) console.log("WARNING: JWT_SECRET is not set. Add it
 // ================================
 
 app.set("trust proxy", 1); // correct visitor IP behind Render (for login lockout)
-app.use(cors());
+// CORS: the hospital site and staff portal are separate websites (e.g. on Vercel).
+// Set CORS_ORIGINS on the host to their addresses, comma separated, no trailing slash:
+//   CORS_ORIGINS=https://my-hospital.vercel.app,https://my-staff-portal.vercel.app
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "").split(",").map(o => o.trim().replace(/\/$/, "")).filter(Boolean);
+if (!ALLOWED_ORIGINS.length) console.log("WARNING: CORS_ORIGINS is not set, so any website can call this API. Set it on your host.");
+app.use(cors({
+    origin: (origin, cb) => cb(null, !origin || !ALLOWED_ORIGINS.length || ALLOWED_ORIGINS.includes(origin))
+}));
 app.use(express.json({ limit: "100kb" }));
-
-// ================================
-// SERVE THE WEBSITE PAGES (added)
-// Lets the same Render link open the site (html, css, js, images)
-// while keeping server.js, database.js, .env, .sql files etc. private.
-// ================================
-
-// Finds the folder that holds the website (index.html, hosi, patient ...).
-// Works whether those are next to server.js or one folder above it.
-function findSiteRoot() {
-    const candidates = [__dirname, path.join(__dirname, "..")];
-    for (const dir of candidates) {
-        try {
-            const names = fs.readdirSync(dir).map(n => n.toLowerCase());
-            if (names.includes("hosi") || names.includes("patient") || names.includes("index.html")) return dir;
-        } catch (e) {}
-    }
-    return __dirname;
-}
-
-const SITE_ROOT = findSiteRoot();
-console.log("Website files are served from:", SITE_ROOT);
-try { console.log("Folders found there:", fs.readdirSync(SITE_ROOT).join(", ")); } catch (e) {}
-
-const PUBLIC_FILE_TYPES = [".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".json"];
-const PRIVATE_FILES = ["server.js", "database.js", "staff-api.js", "staff-login.js", "package.json", "package-lock.json"];
-
-app.use((req, res, next) => {
-    if (req.method !== "GET" && req.method !== "HEAD") return next();
-
-    let rel;
-    try { rel = decodeURIComponent(req.path); } catch (e) { return next(); }
-
-    if (rel.includes("..")) return res.status(404).send("Not found");
-
-    const full = path.join(SITE_ROOT, rel);
-
-    // not a real file on disk = one of your API routes, let it through
-    if (!full.startsWith(SITE_ROOT) || !fs.existsSync(full) || !fs.statSync(full).isFile()) return next();
-
-    const ext = path.extname(full).toLowerCase();
-    const name = path.basename(full).toLowerCase();
-
-    if (!PUBLIC_FILE_TYPES.includes(ext) || PRIVATE_FILES.includes(name) || full.includes("node_modules")) {
-        return res.status(404).send("Not found");
-    }
-
-    next();
-});
-
-// PWA: the service worker must never be cached for long, and must control the whole site
-app.get("/sw.js", (req, res, next) => {
-    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.set("Service-Worker-Allowed", "/");
-    next();
-});
-
-app.get("/manifest.webmanifest", (req, res, next) => {
-    res.type("application/manifest+json");
-    res.set("Cache-Control", "no-cache");
-    next();
-});
-
-app.use(express.static(SITE_ROOT, { index: false }));
 
 // Token Verification Middleware
 const verifyToken = (req, res, next) => {
@@ -118,33 +59,8 @@ const getKenyaDate = () => {
 // TEST SERVER
 // ================================
 
-// ORIGINAL (kept): plain text reply
-// app.get("/", (req, res) => {
-//     res.send("Agnes Memorial Hospital Backend Running");
-// });
-
-// Opens your home page (index.html): in the main folder, or inside one of the
-// sub-folders (not hosi / patient). If none is found it shows the original text.
-app.get("/", (req, res) => {
-
-    if (fs.existsSync(path.join(SITE_ROOT, "index.html"))) {
-        return res.sendFile(path.join(SITE_ROOT, "index.html"));
-    }
-
-    try {
-        const skip = ["node_modules", "hosi", "patient"];
-        const folders = fs.readdirSync(SITE_ROOT, { withFileTypes: true })
-            .filter(d => d.isDirectory() && !d.name.startsWith(".") && !skip.includes(d.name.toLowerCase()));
-
-        for (const d of folders) {
-            if (fs.existsSync(path.join(SITE_ROOT, d.name, "index.html"))) {
-                return res.redirect("/" + encodeURIComponent(d.name) + "/index.html");
-            }
-        }
-    } catch (e) {}
-
-    res.send("Agnes Memorial Hospital Backend Running");
-});
+app.get("/", (req, res) => res.send("Agnes Memorial Hospital Backend Running"));
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 // ================================
 // REGISTER USER (Web Account Sign-up)

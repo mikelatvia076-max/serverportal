@@ -12,14 +12,18 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || "agnes_hospital_secret_key";
+// A known default secret would let anyone forge staff tokens, so if JWT_SECRET
+// is not set on the host, a random one is made (staff must log in again after a restart).
+const JWT_SECRET = process.env.JWT_SECRET || require("crypto").randomBytes(48).toString("hex");
+if (!process.env.JWT_SECRET) console.log("WARNING: JWT_SECRET is not set. Add it in your host's environment variables.");
 
 // ================================
 // MIDDLEWARE
 // ================================
 
+app.set("trust proxy", 1); // correct visitor IP behind Render (for login lockout)
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 
 // ================================
 // SERVE THE WEBSITE PAGES (added)
@@ -45,7 +49,7 @@ console.log("Website files are served from:", SITE_ROOT);
 try { console.log("Folders found there:", fs.readdirSync(SITE_ROOT).join(", ")); } catch (e) {}
 
 const PUBLIC_FILE_TYPES = [".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".json"];
-const PRIVATE_FILES = ["server.js", "database.js"];
+const PRIVATE_FILES = ["server.js", "database.js", "staff-api.js", "package.json", "package-lock.json"];
 
 app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
@@ -640,6 +644,12 @@ app.put("/appointments/:id/status", (req, res) => {
         res.json({ message: `Appointment status set to **$status$**` });
     });
 });
+
+// ================================
+// STAFF ACCOUNTS (no public sign-up; admin issues accounts)
+// ================================
+
+app.use("/staff", require("./staff-api")(JWT_SECRET));
 
 // ================================
 // START SERVER

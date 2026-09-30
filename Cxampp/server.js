@@ -44,7 +44,7 @@ const SITE_ROOT = findSiteRoot();
 console.log("Website files are served from:", SITE_ROOT);
 try { console.log("Folders found there:", fs.readdirSync(SITE_ROOT).join(", ")); } catch (e) {}
 
-const PUBLIC_FILE_TYPES = [".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf"];
+const PUBLIC_FILE_TYPES = [".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".json"];
 const PRIVATE_FILES = ["server.js", "database.js"];
 
 app.use((req, res, next) => {
@@ -67,6 +67,19 @@ app.use((req, res, next) => {
         return res.status(404).send("Not found");
     }
 
+    next();
+});
+
+// PWA: the service worker must never be cached for long, and must control the whole site
+app.get("/sw.js", (req, res, next) => {
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.set("Service-Worker-Allowed", "/");
+    next();
+});
+
+app.get("/manifest.webmanifest", (req, res, next) => {
+    res.type("application/manifest+json");
+    res.set("Cache-Control", "no-cache");
     next();
 });
 

@@ -117,7 +117,16 @@ const tableStatements = [
     status VARCHAR(30)
 ) CHARACTER SET utf8mb4`,
 
-// ---- shared with the Staff Portal (must match staff-api.js in the portal) ----
+// ---- shared with the Staff Portal (must match portal-api.js) ----
+`CREATE TABLE IF NOT EXISTS portal_users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    username VARCHAR(60) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    created_at VARCHAR(30),
+    last_login VARCHAR(30)
+) CHARACTER SET utf8mb4`,
+
 `CREATE TABLE IF NOT EXISTS employees (
     id INT AUTO_INCREMENT PRIMARY KEY,
     employee_id VARCHAR(20) UNIQUE,

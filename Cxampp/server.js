@@ -566,11 +566,11 @@ app.put("/appointments/:id/status", (req, res) => {
 // STAFF ACCOUNTS (no public sign-up; admin issues accounts)
 // ================================
 
-// Employees log in to the hospital system here (role picked on hospital-login.html)
-app.use("/staff", require("./staff-login")(JWT_SECRET));
-
-// Admin-only staff portal API (portal-login.html / staff-portal.html)
-app.use("/portal-api", require("./staff-api")(JWT_SECRET));
+// Staff Portal API: portal admins sign up / log in, then create and delete employee logins.
+// portal.js calls API_URL + "/staff/...", so set API_URL in the portal config.js to this backend address.
+const portalApi = require("./portal-api")(JWT_SECRET);
+app.use("/staff", portalApi);
+app.use("/portal-api", portalApi); // same API, extra path (optional)
 
 // ================================
 // START SERVER

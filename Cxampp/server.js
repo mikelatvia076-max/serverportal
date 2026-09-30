@@ -566,11 +566,17 @@ app.put("/appointments/:id/status", (req, res) => {
 // STAFF ACCOUNTS (no public sign-up; admin issues accounts)
 // ================================
 
+// Hospital staff login (hospital-login.html): username + password + role, first-login password change,
+// forgot-password requests. Reads the employees created in the Staff Portal.
+app.use("/staff", require("./staff-login")(JWT_SECRET));
+
 // Staff Portal API: portal admins sign up / log in, then create and delete employee logins.
-// portal.js calls API_URL + "/staff/...", so set API_URL in the portal config.js to this backend address.
+// portal.js calls API_URL + "/staff/...", so in the PORTAL config.js set
+//   API_URL = "https://YOUR-BACKEND.onrender.com/portal-api"
+// (kept apart from /staff above, which belongs to the hospital login page).
 const portalApi = require("./portal-api")(JWT_SECRET);
-app.use("/staff", portalApi);
-app.use("/portal-api", portalApi); // same API, extra path (optional)
+app.use("/portal-api/staff", portalApi);
+app.use("/portal-api", portalApi);
 
 // ================================
 // START SERVER

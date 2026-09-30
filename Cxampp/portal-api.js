@@ -204,5 +204,25 @@ module.exports = function (JWT_SECRET) {
         } catch (err) { res.status(500).json({ message: "Could not reset password" }); }
     });
 
+    // ---------- delete own portal account (needs the password) ----------
+    router.post("/account/delete", auth, async (req, res) => {
+        const password = String((req.body || {}).password || "");
+        if (!password) return res.status(400).json({ message: "Enter your password to confirm" });
+        const key = "delacc|" + req.admin.id;
+        if (blocked(key)) return res.status(429).json({ message: "Too many wrong attempts. Try again in 15 minutes." });
+        try {
+            if (!(await bcrypt.compare(password, req.admin.password))) {
+                fail(key);
+                return res.status(403).json({ message: "Wrong password" });   // 403, not 401, so the page does not log out
+            }
+            await db.query("DELETE FROM portal_users WHERE id=?", [req.admin.id]);
+            fails.delete(key);
+            res.json({ message: "Account deleted" });
+        } catch (err) {
+            console.error("Delete account error:", err);
+            res.status(500).json({ message: "Could not delete account" });
+        }
+    });
+
     return router;
 };

@@ -572,7 +572,7 @@ const staffLogin = require("./staff-login")(JWT_SECRET);   // employees log in t
 const portalApi = require("./portal-api")(JWT_SECRET);     // portal admins create/delete employee logins
 app.use("/staff", (req, res, next) => {
     const p = req.path;
-    if (/^\/(signup|employees|password-requests)/.test(p)) return portalApi(req, res, next);
+    if (/^\/(signup|employees|password-requests|account)/.test(p)) return portalApi(req, res, next);
     if (/^\/(forgot-password|change-password)/.test(p)) return staffLogin(req, res, next);
     if (p === "/login") return ((req.body && req.body.role) ? staffLogin : portalApi)(req, res, next); // only the hospital page sends a role
     if (p === "/me") {

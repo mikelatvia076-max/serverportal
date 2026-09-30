@@ -566,15 +566,22 @@ app.put("/appointments/:id/status", (req, res) => {
 // STAFF ACCOUNTS (no public sign-up; admin issues accounts)
 // ================================
 
-// Hospital staff login (hospital-login.html): username + password + role, first-login password change,
-// forgot-password requests. Reads the employees created in the Staff Portal.
-app.use("/staff", require("./staff-login")(JWT_SECRET));
-
-// Staff Portal API: portal admins sign up / log in, then create and delete employee logins.
-// portal.js calls API_URL + "/staff/...", so in the PORTAL config.js set
-//   API_URL = "https://YOUR-BACKEND.onrender.com/portal-api"
-// (kept apart from /staff above, which belongs to the hospital login page).
-const portalApi = require("./portal-api")(JWT_SECRET);
+// Both websites call "/staff/...": hospital-login.html (staff login) and the Staff Portal (create accounts).
+// This one door sends each request to the right code, so neither website needs a different address.
+const staffLogin = require("./staff-login")(JWT_SECRET);   // employees log in to the hospital system
+const portalApi = require("./portal-api")(JWT_SECRET);     // portal admins create/delete employee logins
+app.use("/staff", (req, res, next) => {
+    const p = req.path;
+    if (/^\/(signup|employees|password-requests)/.test(p)) return portalApi(req, res, next);
+    if (/^\/(forgot-password|change-password)/.test(p)) return staffLogin(req, res, next);
+    if (p === "/login") return ((req.body && req.body.role) ? staffLogin : portalApi)(req, res, next); // only the hospital page sends a role
+    if (p === "/me") {
+        const t = jwt.decode((req.headers.authorization || "").split(" ")[1] || "");
+        return ((t && t.type === "portal") ? portalApi : staffLogin)(req, res, next);
+    }
+    next();
+});
+// Same portal API on its own address too (optional)
 app.use("/portal-api/staff", portalApi);
 app.use("/portal-api", portalApi);
 

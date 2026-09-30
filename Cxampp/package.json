@@ -1,5 +1,5 @@
 {
-  "name": "agnes-hospital-backend",
+  "name": "agnes-hospital",
   "version": "1.0.0",
   "description": "Agnes Memorial Medical Hospital backend",
   "main": "server.js",

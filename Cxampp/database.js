@@ -1,64 +1,40 @@
 // =================================
-// AGNES MEMORIAL HOSPITAL DATABASE
+// AGNES MEMORIAL HOSPITAL DATABASE  (hospital backend)
+// Shared MySQL database: the Staff Portal writes the "employees" and
+// "password_requests" tables, this backend reads them. Both tables are
+// created here too, with the SAME columns as the portal, so it does not
+// matter which service starts first.
 // =================================
 
 const mysql = require("mysql2");
 
-// ---- ORIGINAL (single connection) - kept for reference ----
-// const db = mysql.createConnection({
-//     host: process.env.DB_HOST || "localhost",
-//     user: process.env.DB_USER || "root",
-//     password: process.env.DB_PASSWORD || "",
-//     database: process.env.DB_NAME || "agnes_hospital",
-//     port: process.env.DB_PORT || 3306,
-//     dateStrings: true
-// });
-//
-// db.connect((err)=>{
-//     if(err){
-//         console.log("Database connection failed");
-//         console.log(err);
-//     }
-//     else{
-//         console.log("Database connected successfully");
-//     }
-// });
-
-// ---- CORRECTED: connection pool ----
-// A single connection gets closed by cloud MySQL after a while of no use
-// and then every login fails. A pool reconnects by itself. db.query(...)
-// is used exactly the same way, so server.js needs no change.
-//
-// Cloud databases (Aiven, TiDB Cloud, PlanetScale, Railway...) usually need
-// SSL. On your host set DB_SSL=true to turn it on.
+// Pool: reconnects by itself (a single connection is dropped by cloud MySQL).
+// Cloud databases (Aiven, TiDB Cloud, Railway...) usually need SSL: set DB_SSL=true.
 const db = mysql.createPool({
     host: process.env.DB_HOST || "localhost",
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "agnes_hospital",
-    port: process.env.DB_PORT || 3306,
+    port: Number(process.env.DB_PORT) || 3306,
     dateStrings: true,
     waitForConnections: true,
     connectionLimit: 10,
+    queueLimit: 0,
     enableKeepAlive: true,
     ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined
 });
 
-db.getConnection((err, connection)=>{
-    if(err){
+db.getConnection((err, connection) => {
+    if (err) {
         console.log("Database connection failed");
         console.log(err);
-    }
-    else{
+    } else {
         console.log("Database connected successfully");
         connection.release();
     }
 });
 
-// ---- AUTO-CREATE TABLES (added) ----
-// A new cloud database starts empty. These statements create every table
-// server.js uses, only if it does not exist yet, so they are safe to run on
-// every start and never touch data that is already there.
+// ---- AUTO-CREATE TABLES (safe to run on every start) ----
 const tableStatements = [
 
 `CREATE TABLE IF NOT EXISTS users (
@@ -139,21 +115,43 @@ const tableStatements = [
     email VARCHAR(191),
     shift VARCHAR(50),
     status VARCHAR(30)
+) CHARACTER SET utf8mb4`,
+
+// ---- shared with the Staff Portal (must match staff-api.js in the portal) ----
+`CREATE TABLE IF NOT EXISTS employees (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id VARCHAR(20) UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    username VARCHAR(60) NOT NULL UNIQUE,
+    email VARCHAR(191) NOT NULL UNIQUE,
+    phone VARCHAR(30),
+    role VARCHAR(30) NOT NULL,
+    department VARCHAR(100),
+    password VARCHAR(255) NOT NULL,
+    status VARCHAR(20) DEFAULT 'Active',
+    must_change_password TINYINT DEFAULT 1,
+    token_version INT DEFAULT 0,
+    created_at VARCHAR(30),
+    last_login VARCHAR(30)
+) CHARACTER SET utf8mb4`,
+
+`CREATE TABLE IF NOT EXISTS password_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    name VARCHAR(150),
+    username VARCHAR(60),
+    created_at VARCHAR(30),
+    status VARCHAR(20) DEFAULT 'Pending'
 ) CHARACTER SET utf8mb4`
 
 ];
 
 let tablesDone = 0;
-
-tableStatements.forEach((sql)=>{
-    db.query(sql, (err)=>{
-        if(err){
-            console.log("Table setup error:", err.message);
-        }
+tableStatements.forEach((sql) => {
+    db.query(sql, (err) => {
+        if (err) console.log("Table setup error:", err.message);
         tablesDone++;
-        if(tablesDone === tableStatements.length){
-            console.log("Database tables checked / created");
-        }
+        if (tablesDone === tableStatements.length) console.log("Database tables checked / created");
     });
 });
 

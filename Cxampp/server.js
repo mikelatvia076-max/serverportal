@@ -3,6 +3,7 @@
 // BACKEND SERVER (CLEANED & FIXED)
 // =====================================
 
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -49,7 +50,7 @@ console.log("Website files are served from:", SITE_ROOT);
 try { console.log("Folders found there:", fs.readdirSync(SITE_ROOT).join(", ")); } catch (e) {}
 
 const PUBLIC_FILE_TYPES = [".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".json"];
-const PRIVATE_FILES = ["server.js", "database.js", "staff-api.js", "package.json", "package-lock.json"];
+const PRIVATE_FILES = ["server.js", "database.js", "staff-api.js", "staff-login.js", "package.json", "package-lock.json"];
 
 app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
@@ -641,7 +642,7 @@ app.put("/appointments/:id/status", (req, res) => {
             console.error("Error updating appointment system status:", err);
             return res.status(500).json({ message: "Database update failed" });
         }
-        res.json({ message: `Appointment status set to **$status$**` });
+        res.json({ message: `Appointment status set to ${status}` });
     });
 });
 
@@ -649,7 +650,11 @@ app.put("/appointments/:id/status", (req, res) => {
 // STAFF ACCOUNTS (no public sign-up; admin issues accounts)
 // ================================
 
-app.use("/staff", require("./staff-api")(JWT_SECRET));
+// Employees log in to the hospital system here (role picked on hospital-login.html)
+app.use("/staff", require("./staff-login")(JWT_SECRET));
+
+// Admin-only staff portal API (portal-login.html / staff-portal.html)
+app.use("/portal-api", require("./staff-api")(JWT_SECRET));
 
 // ================================
 // START SERVER
